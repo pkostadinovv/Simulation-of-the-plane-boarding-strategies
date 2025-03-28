@@ -47,17 +47,31 @@ luggage_vals = ['normal', 0, 1, 2, 3, 4, 5, 6, 7]
 
 grid = CanvasGrid(agent_portrayal, 21, 7, 840, 310)
 
+# Existing user-settable parameters
 method_choice = UserSettableParameter('choice', 'Boarding method', value='Random',
-                                                choices=list(PlaneModel.method_types.keys()))
+                                      choices=list(PlaneModel.method_types.keys()))
 shuffle_choice = UserSettableParameter('checkbox', 'Enable Shuffle', value=True)
-
 bags_choice = UserSettableParameter('choice', 'Luggage Size', value='normal', choices=luggage_vals)
 
-#bags_choice = UserSettableParameter('slider', 'Enable Bags', value='-1', min_value=-1, max_value=10, step=1)
+# NEW PARAMETER: Door configuration
+door_choice = UserSettableParameter(
+    'choice',
+    'Number of Doors',
+    value='1 Door',       # Default
+    choices=['1 Door', '2 Doors']
+)
 
-server = ModularServer(PlaneModel,
-                       [grid],
-                       "Boarding Simulation",
-                       {"method": method_choice, "shuffle_enable": shuffle_choice, 'common_bags': bags_choice})
-server.port = 8521 # The default
+server = ModularServer(
+    PlaneModel,
+    [grid],
+    "Boarding Simulation",
+    {
+        "method": method_choice,
+        "shuffle_enable": shuffle_choice,
+        "common_bags": bags_choice,
+        "door_config": door_choice  # Pass the new param to the model
+    }
+)
+
+server.port = 8521  # The default
 server.launch()
