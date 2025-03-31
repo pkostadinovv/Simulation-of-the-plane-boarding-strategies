@@ -21,10 +21,7 @@ class PassengerAgent(Agent):
         self.group = group
         self.state = 'INACTIVE'
         self.shuffle_dist = 0
-        if self.model.shuffle_enable:
-            self.shuffle = True
-        else:
-            self.shuffle = False
+        self.shuffle = self.model.shuffle_enable
 
         # Baggage size logic
         if self.model.common_bags == 'normal':
@@ -32,17 +29,21 @@ class PassengerAgent(Agent):
         else:
             self.baggage = self.model.common_bags
 
+        # NEW: direction attribute, default = +1 (front->back)
+        # We'll set it to -1 if passenger is assigned to rear door
+        self.direction = 1
+
     def step(self):
-        # -- Agent movement logic (no change) --
+        # Movement logic
         if (self.state == 'GOING'
-            and self.model.get_patch((self.pos[0] + 1, self.pos[1])).state == 'FREE'
-            and self.model.get_patch((self.pos[0] + 1, self.pos[1])).shuffle == 0):
-            if (self.model.get_patch((self.pos[0] + 1, self.pos[1])).back == 0
-                or self.model.get_patch((self.pos[0] + 1, self.pos[1])).allow_shuffle is True):
-                self.model.get_patch((self.pos[0] + 1, self.pos[1])).allow_shuffle = False
-                self.move(1, 0)
+            and self.model.get_patch((self.pos[0] + (1 * self.direction), self.pos[1])).state == 'FREE'
+            and self.model.get_patch((self.pos[0] + (1 * self.direction), self.pos[1])).shuffle == 0):
+            if (self.model.get_patch((self.pos[0] + (1 * self.direction), self.pos[1])).back == 0
+                or self.model.get_patch((self.pos[0] + (1 * self.direction), self.pos[1])).allow_shuffle is True):
+                self.model.get_patch((self.pos[0] + (1 * self.direction), self.pos[1])).allow_shuffle = False
+                self.move(1 * self.direction, 0)
                 if self.shuffle:
-                    if self.pos[0] + 1 == self.seat_pos[0]:
+                    if self.pos[0] == self.seat_pos[0]:
                         self.state = 'SHUFFLE CHECK'
                 if self.pos[0] == self.seat_pos[0]:
                     if self.baggage > 0:
@@ -51,16 +52,17 @@ class PassengerAgent(Agent):
                         self.state = 'SEATING'
 
         elif self.state == 'SHUFFLE':
-            if (self.pos[1] == 3
-                and self.model.get_patch((self.pos[0] + 1, self.pos[1])).state == 'FREE'):
+            # For shuffle, we continue in +1 direction
+            if (self.pos[1] == 3 and
+                self.model.get_patch((self.pos[0] + self.direction, self.pos[1])).state == 'FREE'):
                 if self.pos[0] == self.seat_pos[0]:
                     self.shuffle_dist = self.model.get_patch((self.pos[0], self.pos[1])).shuffle
                     self.model.get_patch((self.pos[0], self.pos[1])).shuffle -= 1
-                self.move(1, 0)
+                self.move(self.direction, 0)
                 self.shuffle_dist -= 1
                 if self.shuffle_dist == 0:
                     self.state = 'BACK'
-                    if self.pos[0] - self.seat_pos[0] == 2:
+                    if abs(self.pos[0] - self.seat_pos[0]) == 2:
                         self.model.schedule.safe_remove_priority(self)
                         self.model.schedule.add_priority(self)
             else:
@@ -72,9 +74,9 @@ class PassengerAgent(Agent):
                     self.move(0, 1)
 
         elif (self.state == 'BACK'
-              and self.model.get_patch((self.pos[0] - 1, self.pos[1])).state == 'FREE'
-              and self.model.get_patch((self.pos[0] - 1, self.pos[1])).allow_shuffle is False):
-            self.move(-1, 0)
+              and self.model.get_patch((self.pos[0] - self.direction, self.pos[1])).state == 'FREE'
+              and self.model.get_patch((self.pos[0] - self.direction, self.pos[1])).allow_shuffle is False):
+            self.move(-self.direction, 0)
             if self.pos[0] == self.seat_pos[0]:
                 self.state = 'SEATING'
                 self.model.get_patch((self.pos[0], self.pos[1])).back -= 1
@@ -88,6 +90,7 @@ class PassengerAgent(Agent):
                 self.state = 'SEATING'
 
         elif self.state == 'SEATING':
+            # side movement to seat
             if self.seat_pos[1] in (0, 1, 2):
                 self.move(0, -1)
             else:
@@ -98,23 +101,23 @@ class PassengerAgent(Agent):
                 self.model.schedule.safe_remove_priority(self)
 
         if (self.state == 'SHUFFLE CHECK'
-            and self.model.get_patch((self.pos[0] + 1, self.pos[1])).state == 'FREE'
-            and self.model.get_patch((self.pos[0] + 1, self.pos[1])).ongoing_shuffle == False):
+            and self.model.get_patch((self.pos[0] + self.direction, self.pos[1])).state == 'FREE'
+            and self.model.get_patch((self.pos[0] + self.direction, self.pos[1])).ongoing_shuffle == False):
             try:
                 shuffle_agents = []
                 if self.seat_pos[1] in (0, 1):
                     for y in range(2, self.seat_pos[1], -1):
                         local_agent = self.model.get_passenger((self.seat_pos[0], y))
+                        if local_agent is not None and local_agent.state != 'FINISHED':
+                            raise Exception()
                         if local_agent is not None:
-                            if local_agent.state != 'FINISHED':
-                                raise Exception()
                             shuffle_agents.append(local_agent)
                 elif self.seat_pos[1] in (5, 6):
                     for y in range(4, self.seat_pos[1]):
                         local_agent = self.model.get_passenger((self.seat_pos[0], y))
+                        if local_agent is not None and local_agent.state != 'FINISHED':
+                            raise Exception()
                         if local_agent is not None:
-                            if local_agent.state != 'FINISHED':
-                                raise Exception()
                             shuffle_agents.append(local_agent)
 
                 shuffle_count = len(shuffle_agents)
@@ -122,7 +125,7 @@ class PassengerAgent(Agent):
                     self.model.get_patch((self.seat_pos[0], 3)).shuffle = shuffle_count
                     self.model.get_patch((self.seat_pos[0], 3)).back = shuffle_count
                     self.model.get_patch((self.seat_pos[0], 3)).allow_shuffle = True
-                    self.model.get_patch((self.pos[0] + 1, self.pos[1])).ongoing_shuffle = True
+                    self.model.get_patch((self.pos[0] + self.direction, self.pos[1])).ongoing_shuffle = True
                     for local_agent in shuffle_agents:
                         local_agent.state = 'SHUFFLE'
                         self.model.schedule.safe_remove(local_agent)
@@ -131,17 +134,19 @@ class PassengerAgent(Agent):
             except Exception:
                 pass
 
-    def move(self, m_x, m_y):
-        self.model.get_patch((self.pos[0], self.pos[1])).state = 'FREE'
-        self.model.grid.move_agent(self, (self.pos[0] + m_x, self.pos[1] + m_y))
-        self.model.get_patch((self.pos[0], self.pos[1])).state = 'TAKEN'
+    def move(self, dx, dy):
+        # Clear old cell, move, set new cell
+        old_patch = self.model.get_patch((self.pos[0], self.pos[1]))
+        old_patch.state = 'FREE'
+        self.model.grid.move_agent(self, (self.pos[0] + dx, self.pos[1] + dy))
+        new_patch = self.model.get_patch((self.pos[0], self.pos[1]))
+        new_patch.state = 'TAKEN'
 
     def store_luggage(self):
-        """ For extension if desired. """
         pass
 
     def __str__(self):
-        return "ID {}\t: {}".format(self.unique_id, self.seat_pos)
+        return f"ID {self.unique_id}\t: {self.seat_pos}"
 
 
 class PatchAgent(Agent):
@@ -160,10 +165,9 @@ class PatchAgent(Agent):
 
 class PlaneModel(Model):
     """
-    A model representing a simple plane consisting of 16 rows of 6 seats (2 x 3),
-    using a given boarding method. Now includes an optional "door_config" parameter
-    that can be "1 Door" or "2 Doors". Currently 2-door logic is not yet implemented,
-    but self.two_doors is set accordingly for future expansions.
+    A model representing a plane with 16 rows (x=3..18) and 6 seats wide (y=0,1,2,4,5,6).
+    corridor at y=3. We support 1 or 2 door boarding, set by 'door_config'.
+    If '2 Doors', we create front_boarding_queue and rear_boarding_queue, else single queue.
     """
 
     method_types = {
@@ -186,19 +190,23 @@ class PlaneModel(Model):
         self.schedule = queue_method.QueueActivation(self)
 
         # Store user choices
+        self.method_key = method
         self.method = self.method_types[method]
         self.shuffle_enable = shuffle_enable
         self.common_bags = common_bags
-
-        # NEW: door_config
-        # If door_config == '2 Doors', self.two_doors = True; otherwise False
         self.two_doors = (door_config == '2 Doors')
 
-        # Single boarding queue for now
-        # In the future, you might add self.front_boarding_queue and self.rear_boarding_queue
-        self.boarding_queue = []
+        # 2-door logic: if two_doors is True, we use front_boarding_queue & rear_boarding_queue
+        # otherwise, single boarding_queue
+        if self.two_doors:
+            self.front_boarding_queue = []
+            self.rear_boarding_queue = []
+        else:
+            self.boarding_queue = []
 
-        # Generate passengers using the selected method function
+        # We'll call the chosen boarding method. That function must decide:
+        #  - if two_doors -> put passengers in front or rear queue
+        #  - if one_door  -> put all in single queue
         self.method(self)
 
         # Create patches representing corridor, seats, and walls
@@ -224,23 +232,45 @@ class PlaneModel(Model):
             agent_id += 1
 
     def step(self):
-        # Update all active agents
+        # Step all active agents
         self.schedule.step()
 
-        # The door cell is (0,3) for the single door approach
-        # If self.two_doors is True, we could do something else. But for now, let's keep it the same.
-        if len(self.grid.get_cell_list_contents((0, 3))) == 1:
-            self.get_patch((0, 3)).state = 'FREE'
+        if not self.two_doors:
+            # SINGLE-DOOR logic: front door at (0,3)
+            if len(self.grid.get_cell_list_contents((0, 3))) == 1:
+                self.get_patch((0, 3)).state = 'FREE'
+            if self.get_patch((0, 3)).state == 'FREE' and len(self.boarding_queue) > 0:
+                a = self.boarding_queue.pop()
+                a.state = 'GOING'
+                self.schedule.add(a)
+                self.grid.place_agent(a, (0, 3))
+                self.get_patch((0, 3)).state = 'TAKEN'
+        else:
+            # TWO-DOOR logic: front door (0,3), rear door (20,3)
 
-        # If door patch is free, let the next passenger from the queue enter
-        if self.get_patch((0, 3)).state == 'FREE' and len(self.boarding_queue) > 0:
-            a = self.boarding_queue.pop()
-            a.state = 'GOING'
-            self.schedule.add(a)
-            self.grid.place_agent(a, (0, 3))
-            self.get_patch((0, 3)).state = 'TAKEN'
+            # front door
+            if len(self.grid.get_cell_list_contents((0, 3))) == 1:
+                self.get_patch((0, 3)).state = 'FREE'
+            if self.get_patch((0, 3)).state == 'FREE' and len(self.front_boarding_queue) > 0:
+                front_passenger = self.front_boarding_queue.pop()
+                front_passenger.state = 'GOING'
+                front_passenger.direction = 1  # moves from x=0 -> x=18
+                self.schedule.add(front_passenger)
+                self.grid.place_agent(front_passenger, (0, 3))
+                self.get_patch((0, 3)).state = 'TAKEN'
 
-        # If no agents are left in the schedule, stop
+            # rear door
+            if len(self.grid.get_cell_list_contents((20, 3))) == 1:
+                self.get_patch((20, 3)).state = 'FREE'
+            if self.get_patch((20, 3)).state == 'FREE' and len(self.rear_boarding_queue) > 0:
+                rear_passenger = self.rear_boarding_queue.pop()
+                rear_passenger.state = 'GOING'
+                rear_passenger.direction = -1  # moves from x=20 -> x=3
+                self.schedule.add(rear_passenger)
+                self.grid.place_agent(rear_passenger, (20, 3))
+                self.get_patch((20, 3)).state = 'TAKEN'
+
+        # End if no more active agents
         if self.schedule.get_agent_count() == 0:
             self.running = False
 
