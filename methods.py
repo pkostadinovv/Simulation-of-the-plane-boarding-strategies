@@ -278,62 +278,144 @@ def win_mid_ais(model):
 
 
 def steffen_perfect(model):
-    final_front_group = []
-    final_rear_group = []
-    single_queue = []
+    """
+    Supports both 1-door and 2-door Steffen Perfect.
+      - Single door: rows 3..19 (as before)
+      - Two doors: front is rows 3..9, rear is rows 18..10 (skipping row 19).
+    """
+    if not model.two_doors:
+        # ============ SINGLE-DOOR MODE ============
+        big_group = []
+        id = 1
 
-    big_group = []
-    id = 1
-    # Group 6 seats
-    for y in (2, 4):
-        for x in range(3, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 6)
-            id += 1
-            big_group.append(agent)
-    # Group 5 seats
-    for y in (2, 4):
-        for x in range(4, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 5)
-            id += 1
-            big_group.append(agent)
-    # Group 4 seats
-    for y in (1, 5):
-        for x in range(3, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 4)
-            id += 1
-            big_group.append(agent)
-    # Group 3 seats
-    for y in (1, 5):
-        for x in range(4, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 3)
-            id += 1
-            big_group.append(agent)
-    # Group 2 seats
-    for y in (0, 6):
-        for x in range(3, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 2)
-            id += 1
-            big_group.append(agent)
-    # Group 1 seats
-    for y in (0, 6):
-        for x in range(4, 19, 2):
-            agent = plane.PassengerAgent(id, model, (x, y), 1)
-            id += 1
-            big_group.append(agent)
+        # Group 6 seats (rows 3..19, window seats)
+        for y in (2, 4):
+            for x in range(3, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 6)
+                id += 1
+                big_group.append(agent)
+        # Group 5 seats
+        for y in (2, 4):
+            for x in range(4, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 5)
+                id += 1
+                big_group.append(agent)
+        # Group 4 seats
+        for y in (1, 5):
+            for x in range(3, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 4)
+                id += 1
+                big_group.append(agent)
+        # Group 3 seats
+        for y in (1, 5):
+            for x in range(4, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 3)
+                id += 1
+                big_group.append(agent)
+        # Group 2 seats
+        for y in (0, 6):
+            for x in range(3, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 2)
+                id += 1
+                big_group.append(agent)
+        # Group 1 seats
+        for y in (0, 6):
+            for x in range(4, 19, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 1)
+                id += 1
+                big_group.append(agent)
 
-    if model.two_doors:
-        for agent in big_group:
-            if agent.seat_pos[0] >= 10:
-                final_rear_group.append(agent)
-            else:
-                final_front_group.append(agent)
-        model.random.shuffle(final_front_group)
-        model.random.shuffle(final_rear_group)
-        model.front_boarding_queue.extend(final_front_group)
-        model.rear_boarding_queue.extend(final_rear_group)
-    else:
-        model.random.shuffle(big_group)
         model.boarding_queue.extend(big_group)
+
+    else:
+        # ============ TWO-DOOR MODE ============
+        # Front = rows 3..9
+        # Rear  = rows 18..10 (SKIPPING row 19)
+
+        front_big = []
+        rear_big = []
+        id = 1
+
+        # -------- FRONT BIG (rows 3..9 ascending) --------
+        # group 6
+        for y in (2, 4):
+            for x in range(3, 10, 2):  # 3,5,7,9
+                agent = plane.PassengerAgent(id, model, (x, y), 6)
+                id += 1
+                front_big.append(agent)
+        # group 5
+        for y in (2, 4):
+            for x in range(4, 10, 2):  # 4,6,8
+                agent = plane.PassengerAgent(id, model, (x, y), 5)
+                id += 1
+                front_big.append(agent)
+        # group 4
+        for y in (1, 5):
+            for x in range(3, 10, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 4)
+                id += 1
+                front_big.append(agent)
+        # group 3
+        for y in (1, 5):
+            for x in range(4, 10, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 3)
+                id += 1
+                front_big.append(agent)
+        # group 2
+        for y in (0, 6):
+            for x in range(3, 10, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 2)
+                id += 1
+                front_big.append(agent)
+        # group 1
+        for y in (0, 6):
+            for x in range(4, 10, 2):
+                agent = plane.PassengerAgent(id, model, (x, y), 1)
+                id += 1
+                front_big.append(agent)
+
+        # -------- REAR BIG (rows 18..10 descending) --------
+        # SKIP row 19 by starting at 18
+        # group 6
+        for y in (2, 4):
+            for x in range(18, 9, -2):  # 18,16,14,12,10
+                agent = plane.PassengerAgent(id, model, (x, y), 6)
+                id += 1
+                rear_big.append(agent)
+        # group 5
+        for y in (2, 4):
+            for x in range(17, 9, -2):  # 17,15,13,11
+                agent = plane.PassengerAgent(id, model, (x, y), 5)
+                id += 1
+                rear_big.append(agent)
+        # group 4
+        for y in (1, 5):
+            for x in range(18, 9, -2):
+                agent = plane.PassengerAgent(id, model, (x, y), 4)
+                id += 1
+                rear_big.append(agent)
+        # group 3
+        for y in (1, 5):
+            for x in range(17, 9, -2):
+                agent = plane.PassengerAgent(id, model, (x, y), 3)
+                id += 1
+                rear_big.append(agent)
+        # group 2
+        for y in (0, 6):
+            for x in range(18, 9, -2):
+                agent = plane.PassengerAgent(id, model, (x, y), 2)
+                id += 1
+                rear_big.append(agent)
+        # group 1
+        for y in (0, 6):
+            for x in range(17, 9, -2):
+                agent = plane.PassengerAgent(id, model, (x, y), 1)
+                id += 1
+                rear_big.append(agent)
+
+        # Now place front + rear in separate queues, no shuffle
+        model.front_boarding_queue.extend(front_big)
+        model.rear_boarding_queue.extend(rear_big)
 
 
 def steffen_modified(model):
