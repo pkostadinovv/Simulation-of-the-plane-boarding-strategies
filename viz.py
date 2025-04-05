@@ -45,7 +45,12 @@ def agent_portrayal(agent):
 
 luggage_vals = ['normal', 0, 1, 2, 3, 4, 5, 6, 7]
 
-grid = CanvasGrid(agent_portrayal, 21, 7, 840, 310)
+# 29 seat rows + 3 for walls (left + right) + 1 extra buffer
+num_seat_rows = 29
+total_columns = num_seat_rows + 4  # 3 for padding (walls), 1 extra
+
+grid = CanvasGrid(agent_portrayal, total_columns, 7, total_columns * 40, 280)
+
 
 # Existing user-settable parameters
 method_choice = UserSettableParameter('choice', 'Boarding method', value='Random',

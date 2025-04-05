@@ -1,34 +1,41 @@
+# methods.py (example)
 import plane
 
 def random(model):
-    """ Creates one boarding group, random order. """
-    id = 1
-    group_front = []
-    group_rear = []
-    single_group = []
+    """
+    Creates one boarding group for all seat rows in the plane.
+    If single-door => model.boarding_queue
+    If two-doors => decide front/rear queue. 
+    """
+    id_counter = 1
 
-    for x in range(3, 19):
+    # Use model.seat_start_x and model.seat_end_x for row range
+    # or (3..(3+29)) directly if you prefer to keep it simple.
+    full_group = []
+    for x in range(model.seat_start_x, model.seat_end_x + 1):
         for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), 1)
-            id += 1
-            if model.two_doors:
-                # If row >= 10 => rear; else front
-                if x >= 10:
-                    group_rear.append(agent)
-                else:
-                    group_front.append(agent)
-            else:
-                # Single door
-                single_group.append(agent)
+            agent = plane.PassengerAgent(id_counter, model, (x, y), 1)
+            id_counter += 1
+            full_group.append(agent)
 
+    # Shuffle them
+    model.random.shuffle(full_group)
+
+    # Distribute them into queues
     if model.two_doors:
-        model.random.shuffle(group_front)
-        model.random.shuffle(group_rear)
-        model.front_boarding_queue.extend(group_front)
-        model.rear_boarding_queue.extend(group_rear)
+        # For example, half the rows go to front_queue, half to rear_queue
+        # Or use a row-based cutoff: row < midpoint => front, row >= midpoint => rear
+        # We'll do a naive approach: if x < midpoint => front
+        midpoint = (model.seat_start_x + model.seat_end_x) // 2
+        for agent in full_group:
+            if agent.seat_pos[0] <= midpoint:
+                model.front_boarding_queue.append(agent)
+            else:
+                model.rear_boarding_queue.append(agent)
     else:
-        model.random.shuffle(single_group)
-        model.boarding_queue.extend(single_group)
+        # Single queue
+        model.boarding_queue.extend(full_group)
+
 
 
 def front_to_back_gr(model):
@@ -95,70 +102,81 @@ def front_to_back_gr(model):
         model.random.shuffle(final_group)
         model.boarding_queue.extend(final_group)
 
-
 def back_to_front_gr(model):
-    """Back-to-front in 4 groups."""
-    final_front_group = []
-    final_rear_group = []
-    single_queue = []
+    """
+    A 6-block, back-to-front boarding strategy:
+      - Single door: seat rows are partitioned into 6 blocks from rear (highest x) to front (lowest x), final boarding is strictly back→front.
+      - Two doors: same 6-block arrangement, but we:
+        1) Do a row-based split around the midpoint (+ offset = -1).
+        2) The rear group boards from seat_end down to that midpoint.
+        3) The front group boards from that midpoint down to seat_start.
+        4) The front group's list is reversed so they effectively go from “middle to front” last.
+    """
 
-    id = 1
+    seat_start = model.seat_start_x  # typically 3
+    seat_end   = model.seat_end_x    # typically 31
+
+    # Build a list of rows in descending order: seat_end..seat_start
+    row_list = list(range(seat_end, seat_start - 1, -1))  # e.g. [31..3]
+    one_door_list = row_list[::-1]
+    n_rows = len(row_list)
+    n_blocks = 6
+
+    from math import ceil
+    chunk_size = ceil(n_rows / n_blocks)
+
+    blocks = []
+    idx = 0
+    while idx < n_rows:
+        block_rows = one_door_list[idx : idx + chunk_size]
+        blocks.append(block_rows)
+        idx += chunk_size
+        if len(blocks) == n_blocks:
+            break
+
     final_group = []
-    sub_group = []
+    pid = 1
+    block_id = n_blocks
 
-    # Group 4
-    for x in range(6, 2, -1):
-        for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), 4)
-            id += 1
-            sub_group.append(agent)
-    model.random.shuffle(sub_group)
-    final_group.extend(sub_group)
+    # Build final_group in block order (rearmost block first).
+    for b_rows in blocks:
+        sub_group = []
+        for x in b_rows:  # these rows are from rear to front
+            for y in (0, 1, 2, 4, 5, 6):
+                agent = plane.PassengerAgent(pid, model, (x, y), block_id)
+                pid += 1
+                sub_group.append(agent)
+        model.random.shuffle(sub_group)
+        final_group.extend(sub_group)
+        block_id -= 1
 
-    # Group 3
-    sub_group = []
-    for x in range(10, 6, -1):
-        for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), 3)
-            id += 1
-            sub_group.append(agent)
-    model.random.shuffle(sub_group)
-    final_group.extend(sub_group)
-
-    # Group 2
-    sub_group = []
-    for x in range(14, 10, -1):
-        for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), 2)
-            id += 1
-            sub_group.append(agent)
-    model.random.shuffle(sub_group)
-    final_group.extend(sub_group)
-
-    # Group 1
-    sub_group = []
-    for x in range(18, 14, -1):
-        for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), 1)
-            id += 1
-            sub_group.append(agent)
-    model.random.shuffle(sub_group)
-    final_group.extend(sub_group)
+    # final_group is now from the rearmost block to the frontmost block, back→front.
 
     if model.two_doors:
-        for agent in final_group:
-            if agent.seat_pos[0] >= 10:
-                final_rear_group.append(agent)
-            else:
-                final_front_group.append(agent)
-        model.random.shuffle(final_front_group)
-        model.random.shuffle(final_rear_group)
-        model.front_boarding_queue.extend(final_front_group)
-        model.rear_boarding_queue.extend(final_rear_group)
-    else:
-        model.random.shuffle(final_group)
-        model.boarding_queue.extend(final_group)
+        # offset = -1 so that the rearmost row(s) go to front group
+        offset = -1
+        mid = (seat_start + seat_end) // 2
+        limit = mid + offset
 
+        rear_list = []
+        front_list = []
+
+        for agent in final_group:
+            row_x = agent.seat_pos[0]
+            if row_x > limit:
+                # rearmost seat
+                rear_list.append(agent)
+            else:
+                front_list.append(agent)
+
+        # Reverse front_list so they board from “middle to front” in order
+        rear_list = rear_list[::-1]
+
+        model.rear_boarding_queue.extend(rear_list)
+        model.front_boarding_queue.extend(front_list)
+    else:
+        # Single door: final_group is already strictly back->front
+        model.boarding_queue.extend(final_group)
 
 def front_to_back(model):
     final_front_group = []
@@ -194,36 +212,58 @@ def front_to_back(model):
 
 
 def back_to_front(model):
-    final_front_group = []
-    final_rear_group = []
-    single_queue = []
+    """
+    A pure 'back-to-front' strategy for a plane with seat rows from model.seat_end_x down to model.seat_start_x.
+      - Single door: Creates one big queue (descending row order).
+      - Two doors: Splits passengers around the row midpoint.
+        * Rear group: rows > midpoint
+        * Front group: rows <= midpoint
+    """
 
-    group_id = 16
-    id = 1
-    big_group = []
-    for x in range(3, 19):
-        sub_group = []
+    seat_start = model.seat_start_x  # e.g. 3
+    seat_end   = model.seat_end_x    # e.g. 31
+    # Build a list of rows from seat_end down to seat_start
+    row_list = list(range(seat_end, seat_start - 1, -1))
+    one_door_list = row_list[::-1]
+    # We'll store all passengers in final_group (strict back->front)
+    final_group = []
+    pid = 1
+
+    for x in one_door_list:
         for y in (0, 1, 2, 4, 5, 6):
-            agent = plane.PassengerAgent(id, model, (x, y), group_id)
-            id += 1
-            sub_group.append(agent)
-        model.random.shuffle(sub_group)
-        big_group.extend(sub_group)
-        group_id -= 1
+            agent = plane.PassengerAgent(pid, model, (x, y), group=1)
+            pid += 1
+            final_group.append(agent)
 
     if model.two_doors:
-        for agent in big_group:
-            if agent.seat_pos[0] >= 10:
-                final_rear_group.append(agent)
+        # 2-door approach: find a midpoint in the row range
+        midpoint = (seat_start + seat_end) // 2 -1
+        rear_list = []
+        front_list = []
+
+        # If row_x > midpoint => goes to rear door, else => front
+        for agent in final_group:
+            row_x = agent.seat_pos[0]
+            if row_x > midpoint:
+                rear_list.append(agent)
             else:
-                final_front_group.append(agent)
-        model.random.shuffle(final_front_group)
-        model.random.shuffle(final_rear_group)
-        model.front_boarding_queue.extend(final_front_group)
-        model.rear_boarding_queue.extend(final_rear_group)
+                front_list.append(agent)
+                
+                
+        rear_list = rear_list[::-1]
+        # Optional shuffle of each group
+        # model.random.shuffle(front_list)
+        # model.random.shuffle(rear_list)
+
+        model.rear_boarding_queue.extend(rear_list)
+        model.front_boarding_queue.extend(front_list)
+
     else:
-        model.random.shuffle(big_group)
-        model.boarding_queue.extend(big_group)
+        # 1-door scenario: strictly back->front
+        # If you want to keep them in descending row order, skip shuffle
+        # Or do model.random.shuffle if desired
+        # model.random.shuffle(final_group)
+        model.boarding_queue.extend(final_group)
 
 
 def win_mid_ais(model):

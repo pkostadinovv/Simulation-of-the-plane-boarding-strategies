@@ -14,7 +14,7 @@ method_types = [
     'Front-to-back',
     'Front-to-back (4 groups)',
     'Back-to-front',
-    'Back-to-front (4 groups)',
+    'Back-to-front (6 groups)',
     'Window-Middle-Aisle',
     'Steffen Perfect',
     'Steffen Modified'
@@ -48,7 +48,7 @@ plt.legend(['Random',
             'Front to back',
             'Front to back (4 groups)',
             'Back to front',
-            'Back to front (4 groups)',
+            'Back to front (6 groups)',
             'Window-Middle-Aisle',
             'Steffen Perfect',
             'Steffen Modified'])
