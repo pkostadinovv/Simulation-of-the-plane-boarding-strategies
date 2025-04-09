@@ -134,11 +134,28 @@ if __name__ == "__main__":
         else:
             print(" ==> We fail to reject H0: No significant difference found (p>=0.05).")
 
+        # === PLOT side by side histograms ===
+        do_plot = input("\nPlot both distributions side-by-side? (y/n) [default=n]: ").lower() == "y"
+        if do_plot:
+            plt.figure(figsize=(10, 4))
+
+            # Left subplot: single-door
+            plt.subplot(1, 2, 1)
+            plt.hist(results_1d, bins=40, edgecolor='black', alpha=0.7)
+            plt.title(f"{test_method} (Single-Door) - {test_runs} runs\nMean={mean_1d:.1f}")
+
+            # Right subplot: two-door
+            plt.subplot(1, 2, 2)
+            plt.hist(results_2d, bins=40, edgecolor='black', alpha=0.7, color='orange')
+            plt.title(f"{test_method} (Two-Door) - {test_runs} runs\nMean={mean_2d:.1f}")
+
+            plt.tight_layout()
+            plt.show()
+
 
     # --- Option 3: T-test comparing 'Back-to-front' vs. 'Random' under single-door
     elif choice == "3":
         print("\n=== T-TEST: Comparing 'Back-to-front' vs. 'Random' (Single Door) ===")
-        # Let user decide how many runs
         runs_input = input("How many simulations per method? [default=1000]: ").strip()
         if runs_input == "":
             test_runs = 1000
@@ -166,5 +183,23 @@ if __name__ == "__main__":
             print(" ==> We can reject H0: There's a significant difference between 'Back-to-front' and 'Random' in single-door mode.")
         else:
             print(" ==> We fail to reject H0: No significant difference found (p>=0.05).")
+
+        # === PLOT side by side histograms ===
+        do_plot = input("\nPlot both distributions side-by-side? (y/n) [default=n]: ").lower() == "y"
+        if do_plot:
+            plt.figure(figsize=(10, 4))
+
+            # Left subplot: back-to-front
+            plt.subplot(1, 2, 1)
+            plt.hist(results_back_front, bins=40, edgecolor='black', alpha=0.7)
+            plt.title(f"Back-to-front - {test_runs} runs\nMean={mean_bf:.1f}")
+
+            # Right subplot: random
+            plt.subplot(1, 2, 2)
+            plt.hist(results_random, bins=40, edgecolor='black', alpha=0.7, color='green')
+            plt.title(f"Random - {test_runs} runs\nMean={mean_rn:.1f}")
+
+            plt.tight_layout()
+            plt.show()
 
     print("\nAll done!")
