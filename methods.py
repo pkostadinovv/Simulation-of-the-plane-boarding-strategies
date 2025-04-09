@@ -210,61 +210,81 @@ def front_to_back(model):
         model.random.shuffle(big_group)
         model.boarding_queue.extend(big_group)
 
-
 def back_to_front(model):
     """
-    A pure 'back-to-front' strategy for a plane with seat rows from model.seat_end_x down to model.seat_start_x.
-      - Single door: Creates one big queue (descending row order).
-      - Two doors: Splits passengers around the row midpoint.
-        * Rear group: rows > midpoint
-        * Front group: rows <= midpoint
+    A 'back-to-front' strategy with 15% of agents following a purely random order
+    instead of the standard BFS seat order.
+      - Single door: merges BFS and random in one final queue
+      - Two doors: after partial random assignment, we split by midpoint for front/rear queues
     """
+    import random
 
-    seat_start = model.seat_start_x  # e.g. 3
-    seat_end   = model.seat_end_x    # e.g. 31
-    # Build a list of rows from seat_end down to seat_start
-    row_list = list(range(seat_end, seat_start - 1, -1))
-    one_door_list = row_list[::-1]
-    # We'll store all passengers in final_group (strict back->front)
+    seat_start = model.seat_start_x  # e.g., 3
+    seat_end   = model.seat_end_x    # e.g., 31
+
+    # We'll keep 85% BFS, 15% random
+    random_fraction = 0.15
+
+    # 1) Build a list of all passengers in strict descending row order
+    row_list = list(range(seat_end, seat_start - 1, -1))  # e.g. [31..3]
     final_group = []
     pid = 1
 
-    for x in one_door_list:
+    for x in row_list:  # back->front seat rows
         for y in (0, 1, 2, 4, 5, 6):
             agent = plane.PassengerAgent(pid, model, (x, y), group=1)
             pid += 1
             final_group.append(agent)
 
+    # 2) Choose 15% of them to "follow random strategy"
+    # i.e., reorder them in a purely random row order
+    total_agents = len(final_group)
+    rand_count = int(random_fraction * total_agents)
+    if rand_count > 0:
+        # pick random subset
+        rand_indices = random.sample(range(total_agents), rand_count)
+        # Extract those agents
+        random_agents = [final_group[i] for i in rand_indices]
+
+        # Remove them from BFS group
+        for i in sorted(rand_indices, reverse=True):
+            del final_group[i]
+
+        # Reassign them seats in random row/column order
+        # Approach A: Actually give them random seat positions (swapping with BFS)
+        # Approach B: Just reinsert them in random positions within the final queue
+        # For example, let's do Approach B:
+
+        random.shuffle(random_agents)  # purely random order
+        for agent in random_agents:
+            insert_pos = random.randint(0, len(final_group))
+            final_group.insert(insert_pos, agent)
+
+    # 3) Reverse final list so that .pop() will yield the highest row first
+    #    (assuming your model uses .pop() from the end in the step() method)
+    final_group.reverse()
+
+    # 4) For two-door logic, we do midpoint partition
     if model.two_doors:
-        # 2-door approach: find a midpoint in the row range
-        midpoint = (seat_start + seat_end) // 2 -1
+        midpoint = (seat_start + seat_end) // 2
         rear_list = []
         front_list = []
 
-        # If row_x > midpoint => goes to rear door, else => front
         for agent in final_group:
             row_x = agent.seat_pos[0]
             if row_x > midpoint:
                 rear_list.append(agent)
             else:
                 front_list.append(agent)
-                
-                
-        rear_list = rear_list[::-1]
-        # Optional shuffle of each group
-        # model.random.shuffle(front_list)
-        # model.random.shuffle(rear_list)
+
+        # Optionally reverse one or both sub-lists if your .pop() usage needs it
+        # e.g., rear_list = list(reversed(rear_list))
 
         model.rear_boarding_queue.extend(rear_list)
         model.front_boarding_queue.extend(front_list)
-
     else:
-        # 1-door scenario: strictly back->front
-        # If you want to keep them in descending row order, skip shuffle
-        # Or do model.random.shuffle if desired
-        # model.random.shuffle(final_group)
+        # 1-door scenario
         model.boarding_queue.extend(final_group)
-
 
 def win_mid_ais(model):
     final_front_group = []
