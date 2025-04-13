@@ -7,9 +7,9 @@ import numpy as np
 
 def baggage_normal():
     """ Generates a positive integer number from normal distribution """
-    value = round(np.random.normal(7, 2), 0)
+    value = round(np.random.normal(15, 2), 5)
     while value < 0:
-        value = round(np.random.normal(7, 2), 0)
+        value = round(np.random.normal(15, 2), 5)
     return value
 
 
@@ -166,6 +166,8 @@ class PlaneModel(Model):
         self.shuffle_enable = shuffle_enable
         self.common_bags = common_bags
         self.two_doors = (door_config == '2 Doors')
+        self.load_factor=0.8  # New param. Default 80% load factor
+
 
         if self.two_doors:
             self.front_boarding_queue = []
@@ -174,6 +176,20 @@ class PlaneModel(Model):
             self.boarding_queue = []
 
         self.method(self)
+
+        if self.two_doors:
+            # FRONT
+            self.random.shuffle(self.front_boarding_queue)
+            keep_front = int(len(self.front_boarding_queue) * self.load_factor)
+            self.front_boarding_queue = self.front_boarding_queue[:keep_front]
+            # REAR
+            self.random.shuffle(self.rear_boarding_queue)
+            keep_rear = int(len(self.rear_boarding_queue) * self.load_factor)
+            self.rear_boarding_queue = self.rear_boarding_queue[:keep_rear]
+        else:
+            self.random.shuffle(self.boarding_queue)
+            keep_count = int(len(self.boarding_queue) * self.load_factor)
+            self.boarding_queue = self.boarding_queue[:keep_count]
 
         agent_id = 97
         for row in (0, 1, 2, 4, 5, 6):
@@ -194,11 +210,12 @@ class PlaneModel(Model):
     def step(self):
         self.schedule.step()
         rear_door_x = self.grid.width - 1
-
+        prob_spawn = 0
         if not self.two_doors:
             if len(self.grid.get_cell_list_contents((0, 3))) == 1:
                 self.get_patch((0, 3)).state = 'FREE'
-            if self.get_patch((0, 3)).state == 'FREE' and self.boarding_queue:
+            k = np.random.uniform(0,1)
+            if self.get_patch((0, 3)).state == 'FREE' and self.boarding_queue and k>=prob_spawn:
                 a = self.boarding_queue.pop()
                 a.state = 'GOING'
                 self.schedule.add(a)
@@ -207,7 +224,8 @@ class PlaneModel(Model):
         else:
             if len(self.grid.get_cell_list_contents((0, 3))) == 1:
                 self.get_patch((0, 3)).state = 'FREE'
-            if self.get_patch((0, 3)).state == 'FREE' and self.front_boarding_queue:
+            k = np.random.poisson(prob_spawn)
+            if self.get_patch((0, 3)).state == 'FREE' and self.front_boarding_queue and k>=1:
                 a = self.front_boarding_queue.pop()
                 a.state = 'GOING'
                 a.direction = 1
@@ -217,7 +235,8 @@ class PlaneModel(Model):
 
             if len(self.grid.get_cell_list_contents((rear_door_x, 3))) == 1:
                 self.get_patch((rear_door_x, 3)).state = 'FREE'
-            if self.get_patch((rear_door_x, 3)).state == 'FREE' and self.rear_boarding_queue:
+            k = np.random.poisson(prob_spawn)
+            if self.get_patch((rear_door_x, 3)).state == 'FREE' and self.rear_boarding_queue and k>=1:
                 a = self.rear_boarding_queue.pop()
                 a.state = 'GOING'
                 a.direction = -1
