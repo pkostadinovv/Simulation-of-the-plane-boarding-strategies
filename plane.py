@@ -240,11 +240,11 @@ class PlaneModel(Model):
                 self.grid.place_agent(a, (0, 3))
                 self.get_patch((0, 3)).state = 'TAKEN'
         else:
-            prob_spawn = 1.5
+            prob_spawn = 0
             if len(self.grid.get_cell_list_contents((0, 3))) == 1:
                 self.get_patch((0, 3)).state = 'FREE'
-            k = np.random.poisson(prob_spawn)
-            if self.get_patch((0, 3)).state == 'FREE' and self.front_boarding_queue and k>=1:
+            k = np.random.uniform(0,1)
+            if self.get_patch((0, 3)).state == 'FREE' and self.front_boarding_queue and k>=prob_spawn:
                 a = self.front_boarding_queue.pop()
                 a.state = 'GOING'
                 a.direction = 1
@@ -254,8 +254,8 @@ class PlaneModel(Model):
 
             if len(self.grid.get_cell_list_contents((rear_door_x, 3))) == 1:
                 self.get_patch((rear_door_x, 3)).state = 'FREE'
-            k = np.random.poisson(prob_spawn)
-            if self.get_patch((rear_door_x, 3)).state == 'FREE' and self.rear_boarding_queue and k>=1:
+            k = np.random.uniform(0,1)  
+            if self.get_patch((rear_door_x, 3)).state == 'FREE' and self.rear_boarding_queue and k>=prob_spawn:
                 a = self.rear_boarding_queue.pop()
                 a.state = 'GOING'
                 a.direction = -1
