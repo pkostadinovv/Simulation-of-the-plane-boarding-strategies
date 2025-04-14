@@ -178,18 +178,35 @@ class PlaneModel(Model):
         self.method(self)
 
         if self.two_doors:
-            # FRONT
-            self.random.shuffle(self.front_boarding_queue)
+            # FRONT queue
+            if self.method_key == "Random":
+                self.random.shuffle(self.front_boarding_queue)  # only shuffle if random method
+            # preserve seat order if not random; just sub-sample
             keep_front = int(len(self.front_boarding_queue) * self.load_factor)
-            self.front_boarding_queue = self.front_boarding_queue[:keep_front]
-            # REAR
-            self.random.shuffle(self.rear_boarding_queue)
+            indices_front = self.random.sample(range(len(self.front_boarding_queue)), keep_front)
+            indices_front.sort()  # so we keep the original seat order
+            new_front = [self.front_boarding_queue[i] for i in indices_front]
+            self.front_boarding_queue = new_front
+
+            # REAR queue
+            if self.method_key == "Random":
+                self.random.shuffle(self.rear_boarding_queue)
             keep_rear = int(len(self.rear_boarding_queue) * self.load_factor)
-            self.rear_boarding_queue = self.rear_boarding_queue[:keep_rear]
+            indices_rear = self.random.sample(range(len(self.rear_boarding_queue)), keep_rear)
+            indices_rear.sort()
+            new_rear = [self.rear_boarding_queue[i] for i in indices_rear]
+            self.rear_boarding_queue = new_rear
+
         else:
-            self.random.shuffle(self.boarding_queue)
+            # Single-door
+            if self.method_key == "Random":
+                self.random.shuffle(self.boarding_queue)
             keep_count = int(len(self.boarding_queue) * self.load_factor)
-            self.boarding_queue = self.boarding_queue[:keep_count]
+            indices = self.random.sample(range(len(self.boarding_queue)), keep_count)
+            indices.sort()
+            newQ = [self.boarding_queue[i] for i in indices]
+            self.boarding_queue = newQ
+
 
         agent_id = 97
         for row in (0, 1, 2, 4, 5, 6):
@@ -210,8 +227,9 @@ class PlaneModel(Model):
     def step(self):
         self.schedule.step()
         rear_door_x = self.grid.width - 1
-        prob_spawn = 0
+
         if not self.two_doors:
+            prob_spawn = 0
             if len(self.grid.get_cell_list_contents((0, 3))) == 1:
                 self.get_patch((0, 3)).state = 'FREE'
             k = np.random.uniform(0,1)
@@ -222,6 +240,7 @@ class PlaneModel(Model):
                 self.grid.place_agent(a, (0, 3))
                 self.get_patch((0, 3)).state = 'TAKEN'
         else:
+            prob_spawn = 1.5
             if len(self.grid.get_cell_list_contents((0, 3))) == 1:
                 self.get_patch((0, 3)).state = 'FREE'
             k = np.random.poisson(prob_spawn)
@@ -244,7 +263,7 @@ class PlaneModel(Model):
                 self.grid.place_agent(a, (rear_door_x, 3))
                 self.get_patch((rear_door_x, 3)).state = 'TAKEN'
 
-        if self.schedule.get_agent_count() == 0:
+        if self.schedule.get_agent_count() == 0 and not self.has_more_passengers():
             self.running = False
 
     def get_patch(self, pos):
@@ -253,6 +272,14 @@ class PlaneModel(Model):
             if isinstance(a, PatchAgent):
                 return a
         return None
+
+    def has_more_passengers(self):
+        """Return True if there are passengers in any queue."""
+        if self.two_doors:
+            return (len(self.front_boarding_queue) > 0 or
+                    len(self.rear_boarding_queue) > 0)
+        else:
+            return (len(self.boarding_queue) > 0)
 
     def get_passenger(self, pos):
         agents = self.grid.get_cell_list_contents(pos)

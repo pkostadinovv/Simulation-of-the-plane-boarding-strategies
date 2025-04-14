@@ -279,7 +279,7 @@ def back_to_front(model):
 
         # Optionally reverse one or both sub-lists if your .pop() usage needs it
         # e.g., rear_list = list(reversed(rear_list))
-
+        rear_list.reverse()
         model.rear_boarding_queue.extend(rear_list)
         model.front_boarding_queue.extend(front_list)
     else:
