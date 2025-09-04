@@ -1,3 +1,43 @@
+# Airplane Boarding Simulation (Extended Fork)
+
+This project is a fork of the original **Simulation of Plane Boarding Strategies**, expanded with new features and analysis tools.  
+The aim is to study how different airplane boarding methods affect overall boarding time, using **agent-based modeling** with [Mesa](https://mesa.readthedocs.io/).
+
+---
+
+## New Features in This Fork
+
+Compared to the original implementation, this fork adds:
+
+- **Extended Plane Layout**
+  - Support for **two airplane doors** (front and back boarding).
+  - Expanded seating configurations with more rows.
+
+- **Focused Boarding Strategies**
+  - Adapted simulation to test only three strategies:
+    - **Back-to-front**
+    - **Front-to-back**
+    - **Random order**
+
+- **Statistical Analysis**
+  - Added **p-tests (hypothesis testing)** to evaluate whether one boarding strategy is statistically better than another.
+  - Provides mean, variance, and significance testing for boarding times.
+
+- **Console-Based GUI**
+  - A simple text interface lets users:
+    - Choose which strategies to compare.
+    - Configure number of simulation runs.
+    - View results in the terminal.
+  
+- **Graphs and Visualization**
+  - Extended plotting features to compare distributions of boarding times.
+  - Visualizations include:
+    - Histograms
+    - Boxplots
+    - Statistical summaries
+
+---
+# Original ReadMe:
 #  Simulation of the plane boarding strategies
 
 The aim of this project it to examine and compare various methods of boarding a plane (16 rows consisting of 6 seats each).
